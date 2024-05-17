@@ -1,6 +1,7 @@
-﻿<Window x:Class="Microsoft.Samples.Kinect.BodyBasics.MainWindow"
+﻿<Window
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="d" x:Class="Microsoft.Samples.Kinect.BodyBasics.MainWindow"
         Title="Body Basics" 
         Height="800" Width="1200" 
         Loaded="MainWindow_Loaded"
@@ -29,10 +30,11 @@
             <Image Source="{Binding ImageSource}" Stretch="UniformToFill" />
         </Viewbox>
 
-        <StatusBar Grid.Row="3" HorizontalAlignment="Stretch" Name="statusBar" VerticalAlignment="Bottom" Background="White" Foreground="{StaticResource MediumGreyBrush}" Grid.ColumnSpan="3" Margin="0,0,-0.4,0.4">
+        <StatusBar Grid.Row="3" HorizontalAlignment="Stretch" x:Name="statusBar" VerticalAlignment="Bottom" Background="White" Foreground="{StaticResource MediumGreyBrush}" Grid.ColumnSpan="3" Margin="0,0,-0.4,0.4">
             <StatusBarItem Content="{Binding StatusText}" />
         </StatusBar>
         <TextBox HorizontalAlignment="Left" Height="23" Margin="10,593.8,0,0" Grid.Row="1" TextWrapping="Wrap" Text="記分板：" VerticalAlignment="Top" Width="120" TextChanged="TextBox_TextChanged"/>
         <Canvas x:Name="MainCanvas" Grid.ColumnSpan="3" HorizontalAlignment="Left" Height="598" VerticalAlignment="Top" Width="1174" Margin="0,46,-0.4,0" Grid.RowSpan="3" />
+        <Canvas x:Name="SkeletonCanvas" HorizontalAlignment="Right" Height="764" Margin="0,0,9.6,0" Grid.RowSpan="3" VerticalAlignment="Top" Width="1164" Grid.ColumnSpan="3"/>
     </Grid>
 </Window>

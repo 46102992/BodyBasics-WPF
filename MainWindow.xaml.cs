@@ -35,12 +35,12 @@ namespace Microsoft.Samples.Kinect.BodyBasics
         /// <summary>
         /// Thickness of drawn joint lines
         /// </summary>
-        private const double JointThickness = 30;
+        private const double JointThickness = 3;
 
         /// <summary>
         /// Thickness of clip edge rectangles
         /// </summary>
-        private const double ClipBoundsThickness = 30;
+        private const double ClipBoundsThickness = 10;
 
         /// <summary>
         /// Constant for clamping Z values of camera space points from being negative
@@ -50,22 +50,22 @@ namespace Microsoft.Samples.Kinect.BodyBasics
         /// <summary>
         /// Brush used for drawing hands that are currently tracked as closed
         /// </summary>
-        private readonly Brush handClosedBrush = new SolidColorBrush(Color.FromArgb(255, 0, 0, 255));
+        private readonly Brush handClosedBrush = new SolidColorBrush(Color.FromArgb(128, 255, 0, 0));
 
         /// <summary>
         /// Brush used for drawing hands that are currently tracked as opened
         /// </summary>
-        private readonly Brush handOpenBrush = new SolidColorBrush(Color.FromArgb(255, 0, 0, 255));
+        private readonly Brush handOpenBrush = new SolidColorBrush(Color.FromArgb(128, 0, 255, 0));
 
         /// <summary>
         /// Brush used for drawing hands that are currently tracked as in lasso (pointer) position
         /// </summary>
-        private readonly Brush handLassoBrush = new SolidColorBrush(Color.FromArgb(255, 0, 0, 255));
+        private readonly Brush handLassoBrush = new SolidColorBrush(Color.FromArgb(128, 0, 0, 255));
 
         /// <summary>
         /// Brush used for drawing joints that are currently tracked
         /// </summary>
-        private readonly Brush trackedJointBrush = new SolidColorBrush(Color.FromArgb(255, 0, 0, 255));
+        private readonly Brush trackedJointBrush = new SolidColorBrush(Color.FromArgb(255, 68, 192, 68));
 
         /// <summary>
         /// Brush used for drawing joints that are currently inferred
@@ -198,12 +198,12 @@ namespace Microsoft.Samples.Kinect.BodyBasics
             // populate body colors, one for each BodyIndex
             this.bodyColors = new List<Pen>();
 
-            this.bodyColors.Add(new Pen(Brushes.Blue, 60));
-            this.bodyColors.Add(new Pen(Brushes.Blue, 60));
-            this.bodyColors.Add(new Pen(Brushes.Blue, 60));
-            this.bodyColors.Add(new Pen(Brushes.Blue, 60));
-            this.bodyColors.Add(new Pen(Brushes.Blue, 60));
-            this.bodyColors.Add(new Pen(Brushes.Blue, 60));
+            this.bodyColors.Add(new Pen(Brushes.Blue, 10));
+            this.bodyColors.Add(new Pen(Brushes.Blue, 10));
+            this.bodyColors.Add(new Pen(Brushes.Blue, 10));
+            this.bodyColors.Add(new Pen(Brushes.Blue, 10));
+            this.bodyColors.Add(new Pen(Brushes.Blue, 10));
+            this.bodyColors.Add(new Pen(Brushes.Blue, 10));
 
             // set IsAvailableChanged event notifier
             this.kinectSensor.IsAvailableChanged += this.Sensor_IsAvailableChanged;
@@ -323,9 +323,6 @@ namespace Microsoft.Samples.Kinect.BodyBasics
                         this.bodies = new Body[bodyFrame.BodyCount];
                     }
 
-                    // The first time GetAndRefreshBodyData is called, Kinect will allocate each Body in the array.
-                    // As long as those body objects are not disposed and not set to null in the array,
-                    // those body objects will be re-used.
                     bodyFrame.GetAndRefreshBodyData(this.bodies);
                     dataReceived = true;
                 }
@@ -333,51 +330,30 @@ namespace Microsoft.Samples.Kinect.BodyBasics
 
             if (dataReceived)
             {
-                using (DrawingContext dc = this.drawingGroup.Open())
+                this.SkeletonCanvas.Children.Clear(); // 清空之前的骨架
+                foreach (Body body in this.bodies)
                 {
-                    // Draw a transparent background to set the render size
-                    dc.DrawRectangle(Brushes.Black, null, new Rect(0.0, 0.0, this.displayWidth, this.displayHeight));
-
-                    int penIndex = 0;
-                    foreach (Body body in this.bodies)
+                    if (body.IsTracked)
                     {
-                        Pen drawPen = this.bodyColors[penIndex++];
-
-                        if (body.IsTracked)
+                        // 創建 jointPoints 字典
+                        Dictionary<JointType, Point> jointPoints = new Dictionary<JointType, Point>();
+                        foreach (JointType jointType in body.Joints.Keys)
                         {
-                            this.DrawClippedEdges(body, dc);
-
-                            IReadOnlyDictionary<JointType, Joint> joints = body.Joints;
-
-                            // convert the joint points to depth (display) space
-                            Dictionary<JointType, Point> jointPoints = new Dictionary<JointType, Point>();
-
-                            foreach (JointType jointType in joints.Keys)
+                            CameraSpacePoint position = body.Joints[jointType].Position;
+                            if (position.Z < 0)
                             {
-                                // sometimes the depth(Z) of an inferred joint may show as negative
-                                // clamp down to 0.1f to prevent coordinatemapper from returning (-Infinity, -Infinity)
-                                CameraSpacePoint position = joints[jointType].Position;
-                                if (position.Z < 0)
-                                {
-                                    position.Z = InferredZPositionClamp;
-                                }
-
-                                DepthSpacePoint depthSpacePoint = this.coordinateMapper.MapCameraPointToDepthSpace(position);
-                                jointPoints[jointType] = new Point(depthSpacePoint.X, depthSpacePoint.Y);
+                                position.Z = InferredZPositionClamp;
                             }
-
-                            this.DrawBody(joints, jointPoints, dc, drawPen);
-
-                            this.DrawHand(body.HandLeftState, jointPoints[JointType.HandLeft], dc);
-                            this.DrawHand(body.HandRightState, jointPoints[JointType.HandRight], dc);
+                            DepthSpacePoint depthSpacePoint = this.coordinateMapper.MapCameraPointToDepthSpace(position);
+                            jointPoints[jointType] = new Point(depthSpacePoint.X, depthSpacePoint.Y);
                         }
-                    }
 
-                    // prevent drawing outside of our render area
-                    this.drawingGroup.ClipGeometry = new RectangleGeometry(new Rect(0.0, 0.0, this.displayWidth, this.displayHeight));
+                        this.DrawBody(body.Joints, jointPoints, this.SkeletonCanvas, this.bodyColors[0]);
+                    }
                 }
             }
         }
+
 
         /// <summary>
         /// Draws a body
@@ -386,12 +362,12 @@ namespace Microsoft.Samples.Kinect.BodyBasics
         /// <param name="jointPoints">translated positions of joints to draw</param>
         /// <param name="drawingContext">drawing context to draw to</param>
         /// <param name="drawingPen">specifies color to draw a specific body</param>
-        private void DrawBody(IReadOnlyDictionary<JointType, Joint> joints, IDictionary<JointType, Point> jointPoints, DrawingContext drawingContext, Pen drawingPen)
+        private void DrawBody(IReadOnlyDictionary<JointType, Joint> joints, IDictionary<JointType, Point> jointPoints, Canvas canvas, Pen drawingPen)
         {
             // Draw the bones
             foreach (var bone in this.bones)
             {
-                this.DrawBone(joints, jointPoints, bone.Item1, bone.Item2, drawingContext, drawingPen);
+                this.DrawBone(joints, jointPoints, bone.Item1, bone.Item2, canvas, drawingPen);
             }
 
             // Draw the joints
@@ -412,10 +388,21 @@ namespace Microsoft.Samples.Kinect.BodyBasics
 
                 if (drawBrush != null)
                 {
-                    drawingContext.DrawEllipse(drawBrush, null, jointPoints[jointType], JointThickness, JointThickness);
+                    System.Windows.Shapes.Ellipse joint = new System.Windows.Shapes.Ellipse
+                    {
+                        Width = JointThickness,
+                        Height = JointThickness,
+                        Fill = drawBrush
+                    };
+                    Canvas.SetLeft(joint, jointPoints[jointType].X - JointThickness / 2);
+                    Canvas.SetTop(joint, jointPoints[jointType].Y - JointThickness / 2);
+                    canvas.Children.Add(joint);
                 }
             }
         }
+
+
+
 
         /// <summary>
         /// Draws one bone of a body (joint to joint)
@@ -426,27 +413,34 @@ namespace Microsoft.Samples.Kinect.BodyBasics
         /// <param name="jointType1">second joint of bone to draw</param>
         /// <param name="drawingContext">drawing context to draw to</param>
         /// /// <param name="drawingPen">specifies color to draw a specific bone</param>
-        private void DrawBone(IReadOnlyDictionary<JointType, Joint> joints, IDictionary<JointType, Point> jointPoints, JointType jointType0, JointType jointType1, DrawingContext drawingContext, Pen drawingPen)
+        private void DrawBone(IReadOnlyDictionary<JointType, Joint> joints, IDictionary<JointType, Point> jointPoints, JointType jointType0, JointType jointType1, Canvas canvas, Pen drawingPen)
         {
             Joint joint0 = joints[jointType0];
             Joint joint1 = joints[jointType1];
 
-            // If we can't find either of these joints, exit
-            if (joint0.TrackingState == TrackingState.NotTracked ||
-                joint1.TrackingState == TrackingState.NotTracked)
+            if (joint0.TrackingState == TrackingState.NotTracked || joint1.TrackingState == TrackingState.NotTracked)
             {
                 return;
             }
 
-            // We assume all drawn bones are inferred unless BOTH joints are tracked
             Pen drawPen = this.inferredBonePen;
             if ((joint0.TrackingState == TrackingState.Tracked) && (joint1.TrackingState == TrackingState.Tracked))
             {
                 drawPen = drawingPen;
             }
 
-            drawingContext.DrawLine(drawPen, jointPoints[jointType0], jointPoints[jointType1]);
+            System.Windows.Shapes.Line bone = new System.Windows.Shapes.Line
+            {
+                X1 = jointPoints[jointType0].X,
+                Y1 = jointPoints[jointType0].Y,
+                X2 = jointPoints[jointType1].X,
+                Y2 = jointPoints[jointType1].Y,
+                Stroke = drawPen.Brush,
+                StrokeThickness = drawPen.Thickness
+            };
+            canvas.Children.Add(bone);
         }
+
 
         /// <summary>
         /// Draws a hand symbol if the hand is tracked: red circle = closed, green circle = opened; blue circle = lasso
