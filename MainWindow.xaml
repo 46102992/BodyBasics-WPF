@@ -33,8 +33,22 @@
         <StatusBar Grid.Row="3" HorizontalAlignment="Stretch" x:Name="statusBar" VerticalAlignment="Bottom" Background="White" Foreground="{StaticResource MediumGreyBrush}" Grid.ColumnSpan="3" Margin="0,0,-0.4,0.4">
             <StatusBarItem Content="{Binding StatusText}" />
         </StatusBar>
-        <TextBox HorizontalAlignment="Left" Height="23" Margin="10,593.8,0,0" Grid.Row="1" TextWrapping="Wrap" Text="記分板：" VerticalAlignment="Top" Width="120" TextChanged="TextBox_TextChanged"/>
-        <Canvas x:Name="MainCanvas" Grid.ColumnSpan="3" HorizontalAlignment="Left" Height="598" VerticalAlignment="Top" Width="1174" Margin="0,46,-0.4,0" Grid.RowSpan="3" />
-        <Canvas x:Name="SkeletonCanvas" HorizontalAlignment="Right" Height="764" Margin="0,0,9.6,0" Grid.RowSpan="3" VerticalAlignment="Top" Width="1164" Grid.ColumnSpan="3"/>
+        <TextBox x:Name="ScoreTextBox" HorizontalAlignment="Left" Height="23" Margin="-3,9.8,0,0" Grid.Row="1" TextWrapping="Wrap" Text="記分板：" VerticalAlignment="Top" Width="120" TextChanged="TextBox_TextChanged"/>
+        <Canvas x:Name="MainCanvas" Grid.ColumnSpan="2" HorizontalAlignment="Right" Height="418" VerticalAlignment="Top" Width="739" Margin="0,46,297.6,0" Grid.RowSpan="2" Grid.Column="1" />
+        <Canvas x:Name="SkeletonCanvas" HorizontalAlignment="Right" Height="418" Margin="0,0.8,297.6,128.4" VerticalAlignment="Center" Width="739" Grid.Column="1" Grid.Row="1" Grid.ColumnSpan="2"/>
+        <Button Name="StartButton" Content="開始" HorizontalAlignment="Left" VerticalAlignment="Top" Width="100" Height="50" Click="StartButton_Click" Margin="10,51.8,0,0" Grid.Row="1"/>
+        <TextBlock x:Name="TimeRemainingTextBlock" HorizontalAlignment="Center" Margin="394,10,513.6,0" TextWrapping="Wrap" Text="Time Remaining: 60s" VerticalAlignment="Top" FontSize="16" FontWeight="Bold" Grid.Column="2" />
+        <TextBlock HorizontalAlignment="Left" Margin="0,124.8,0,0" Grid.Row="1" VerticalAlignment="Top" Width="117" RenderTransformOrigin="-0.637,-2.584" Height="165">
+            <TextBlock.Inlines>
+                <Run>法國麵包：左手觸碰</Run>
+                <LineBreak/>
+                <Run>球：右手觸碰</Run>
+                <LineBreak/>
+                <Run>炸彈：不可觸碰</Run>
+            </TextBlock.Inlines>
+        </TextBlock>
+
+
+
     </Grid>
 </Window>

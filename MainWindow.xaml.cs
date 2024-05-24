@@ -20,6 +20,7 @@ namespace Microsoft.Samples.Kinect.BodyBasics
     using System.Windows.Media.Animation;
     using System.Linq;
     using Microsoft.Kinect;
+    using System.Windows.Input;
 
     /// <summary>
     /// Interaction logic for MainWindow
@@ -47,6 +48,7 @@ namespace Microsoft.Samples.Kinect.BodyBasics
         /// </summary>
         private const float InferredZPositionClamp = 0.1f;
 
+        private const float boneOffset = -100;
         /// <summary>
         /// Brush used for drawing hands that are currently tracked as closed
         /// </summary>
@@ -135,13 +137,31 @@ namespace Microsoft.Samples.Kinect.BodyBasics
         /// <summary>
         /// Initializes a new instance of the MainWindow class.
         /// </summary>
+        /// 
+
+        private System.Windows.Threading.DispatcherTimer gameTimer;
+        private int gameDuration = 60; // 遊戲時間為60秒
+        private int remainingTime;
+
         public MainWindow()
         {
+            this.WindowState = WindowState.Maximized;
+            this.WindowStyle = WindowStyle.None;
+            InitializeComponent();
+
+            this.MainCanvas.MouseLeftButtonDown += MainCanvas_MouseLeftButtonDown;
+
+            gameTimer = new System.Windows.Threading.DispatcherTimer();
+            gameTimer.Tick += GameTimer_Tick;
+            gameTimer.Interval = new TimeSpan(0, 0, 1);
 
             System.Windows.Threading.DispatcherTimer dispatcherTimer = new System.Windows.Threading.DispatcherTimer();
             dispatcherTimer.Tick += new EventHandler(show);
             dispatcherTimer.Interval = new TimeSpan(0, 0, 1);
             dispatcherTimer.Start();
+
+
+
             // one sensor is currently supported
             this.kinectSensor = KinectSensor.GetDefault();
 
@@ -246,6 +266,83 @@ namespace Microsoft.Samples.Kinect.BodyBasics
             }
         }
 
+        private void GameTimer_Tick(object sender, EventArgs e)
+        {
+            remainingTime--;
+            TimeRemainingTextBlock.Text = $"Time Remaining: {remainingTime}s";
+
+            if (remainingTime <= 0)
+            {
+                EndGame();
+            }
+        }
+
+
+        private void StartButton_Click(object sender, RoutedEventArgs e)
+        {
+            StartGame();
+        }
+        private void StartGame()
+        {
+            score = 0;
+            ScoreTextBox.Text = score.ToString();
+
+            remainingTime = gameDuration;
+            gameTimer.Start();
+
+            StartButton.IsEnabled = false; // 禁用開始按鈕
+        }
+
+        private void EndGame()
+        {
+            gameTimer.Stop();
+            MessageBoxResult result = MessageBox.Show($"遊戲結束！您的最終分數是 {score} 分。是否再來一場？", "遊戲結束", MessageBoxButton.YesNo);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                StartGame();
+            }
+            else
+            {
+                while (imagesOnCanvas.Count > 0)
+                {
+                    Image image = imagesOnCanvas[0];
+                    MainCanvas.Children.Remove(image);
+                    imagesOnCanvas.Remove(image);
+                    imagePositions.Remove(image);
+                }
+            }
+
+            StartButton.IsEnabled = true; // 啟用開始按鈕
+        }
+
+
+        private void MainCanvas_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            // 取得滑鼠點擊的位置
+            Point clickPosition = e.GetPosition(this.MainCanvas);
+
+            // 檢查是否有圖片被點擊
+            CheckClickedImage(clickPosition);
+        }
+        private void CheckClickedImage(Point clickPosition)
+        {
+            foreach (Image image in imagesOnCanvas)
+            {
+                Rect imageRect = new Rect(imagePositions[image], new Size(image.Width, image.Height));
+                if (imageRect.Contains(clickPosition))
+                {
+                    // 圖片被觸碰
+                    IncreaseScore(10); // 增加 10 分
+                    MainCanvas.Children.Remove(image);
+                    imagesOnCanvas.Remove(image);
+                    imagePositions.Remove(image);
+                    break;
+                }
+            }
+        }
+
+
         /// <summary>
         /// Gets or sets the current status text to display
         /// </summary>
@@ -305,6 +402,57 @@ namespace Microsoft.Samples.Kinect.BodyBasics
             }
         }
 
+        private void CheckCollision(CameraSpacePoint handPosition, HandState handState, JointType handJointType)
+        {
+            DepthSpacePoint depthSpacePoint = this.coordinateMapper.MapCameraPointToDepthSpace(handPosition);
+            Point handPoint = new Point(depthSpacePoint.X, depthSpacePoint.Y);
+
+            // 將手部位置進行相同的調整和放大
+            double centerX = MainCanvas.ActualWidth / 2 + boneOffset;
+            double centerY = MainCanvas.ActualHeight / 2;
+            double scaledX = centerX + (handPoint.X - centerX) * scaleFactor;
+            double scaledY = centerY + (handPoint.Y - centerY) * scaleFactor;
+            Point scaledHandPoint = new Point(scaledX, scaledY);
+
+            foreach (Image image in imagesOnCanvas)
+            {
+                Rect imageRect = new Rect(imagePositions[image], new Size(image.Width, image.Height));
+                if (imageRect.Contains(scaledHandPoint))
+                {
+                    // 圖片被觸碰
+                    string imageName = ((BitmapImage)image.Source).UriSource.Segments.Last();
+                    if (handJointType == JointType.HandLeft && imageName == "franch.png")
+                    {
+                        // 左手觸碰到 french 類型圖片
+                        IncreaseScore(10); // 增加 10 分
+                    }
+                    else if (handJointType == JointType.HandRight && imageName == "ball.png")
+                    {
+                        // 右手觸碰到 ball 類型圖片
+                        IncreaseScore(10); // 增加 10 分
+                    }
+                    else
+                    {
+                        // 其他情況
+                        IncreaseScore(-5); // 扣 5 分
+                    }
+
+                    MainCanvas.Children.Remove(image);
+                    imagesOnCanvas.Remove(image);
+                    imagePositions.Remove(image);
+                    break;
+                }
+            }
+        }
+
+
+
+
+        /// <summary>
+        /// Handles the body frame data arriving from the sensor
+        /// </summary>
+        /// <param name="sender">object sending the event</param>
+        /// <param name="e">event arguments</param>
         /// <summary>
         /// Handles the body frame data arriving from the sensor
         /// </summary>
@@ -335,6 +483,39 @@ namespace Microsoft.Samples.Kinect.BodyBasics
                 {
                     if (body.IsTracked)
                     {
+                        HandState leftHandState = body.HandLeftState;
+                        if (leftHandState == HandState.Closed)
+                        {
+                            // 左手握拳
+                            // 在左手位置繪製一個紅色圓圈
+                            DrawHandPosition(body.Joints[JointType.HandLeft].Position, Brushes.Red);
+                            // 檢查是否有圖片被觸碰
+                            CheckCollision(body.Joints[JointType.HandLeft].Position, leftHandState, JointType.HandLeft);
+                        }
+                        else
+                        {
+                            // 左手不是握拳
+                            // 在左手位置繪製一個綠色圓圈
+                            DrawHandPosition(body.Joints[JointType.HandLeft].Position, Brushes.Green);
+                        }
+
+                        // 檢查右手狀態
+                        HandState rightHandState = body.HandRightState;
+                        if (rightHandState == HandState.Closed)
+                        {
+                            // 右手握拳
+                            // 在右手位置繪製一個紅色圓圈
+                            DrawHandPosition(body.Joints[JointType.HandRight].Position, Brushes.Red);
+                            // 檢查是否有圖片被觸碰
+                            CheckCollision(body.Joints[JointType.HandRight].Position, rightHandState, JointType.HandRight);
+                        }
+                        else
+                        {
+                            // 右手不是握拳
+                            // 在右手位置繪製一個綠色圓圈
+                            DrawHandPosition(body.Joints[JointType.HandRight].Position, Brushes.Green);
+                        }
+
                         // 創建 jointPoints 字典
                         Dictionary<JointType, Point> jointPoints = new Dictionary<JointType, Point>();
                         foreach (JointType jointType in body.Joints.Keys)
@@ -354,6 +535,32 @@ namespace Microsoft.Samples.Kinect.BodyBasics
             }
         }
 
+        private void DrawHandPosition(CameraSpacePoint handPosition, Brush handBrush)
+        {
+            DepthSpacePoint depthSpacePoint = this.coordinateMapper.MapCameraPointToDepthSpace(handPosition);
+            Point handPoint = new Point(depthSpacePoint.X, depthSpacePoint.Y);
+
+            double centerX = MainCanvas.ActualWidth / 2 + boneOffset;
+            double centerY = MainCanvas.ActualHeight / 2;
+            double scaledX = centerX + (handPoint.X - centerX) * scaleFactor;
+            double scaledY = centerY + (handPoint.Y - centerY) * scaleFactor;
+
+            System.Windows.Shapes.Ellipse handCircle = new System.Windows.Shapes.Ellipse
+            {
+                Width = 40,
+                Height = 40,
+                Fill = handBrush,
+                Stroke = Brushes.Black,
+                StrokeThickness = 2
+            };
+            Canvas.SetLeft(handCircle, scaledX - 10);
+            Canvas.SetTop(handCircle, scaledY - 10);
+            this.SkeletonCanvas.Children.Add(handCircle);
+        }
+
+
+        private double scaleFactor = 1.5; // 調整此值以更改骨架大小
+
 
         /// <summary>
         /// Draws a body
@@ -364,13 +571,18 @@ namespace Microsoft.Samples.Kinect.BodyBasics
         /// <param name="drawingPen">specifies color to draw a specific body</param>
         private void DrawBody(IReadOnlyDictionary<JointType, Joint> joints, IDictionary<JointType, Point> jointPoints, Canvas canvas, Pen drawingPen)
         {
-            // Draw the bones
+            double canvasWidth = canvas.ActualWidth;
+            double canvasHeight = canvas.ActualHeight;
+            double centerX = canvasWidth / 2 + boneOffset;
+            double centerY = canvasHeight / 2;
+            Dictionary<JointType, Point> jointPositions = new Dictionary<JointType, Point>();
+            // 繪製骨架
             foreach (var bone in this.bones)
             {
-                this.DrawBone(joints, jointPoints, bone.Item1, bone.Item2, canvas, drawingPen);
+                this.DrawBone(joints, jointPoints, bone.Item1, bone.Item2, canvas, drawingPen, centerX, centerY, this.scaleFactor);
             }
 
-            // Draw the joints
+            // 繪製關節
             foreach (JointType jointType in joints.Keys)
             {
                 Brush drawBrush = null;
@@ -390,19 +602,16 @@ namespace Microsoft.Samples.Kinect.BodyBasics
                 {
                     System.Windows.Shapes.Ellipse joint = new System.Windows.Shapes.Ellipse
                     {
-                        Width = JointThickness,
-                        Height = JointThickness,
+                        Width = JointThickness * this.scaleFactor,
+                        Height = JointThickness * this.scaleFactor,
                         Fill = drawBrush
                     };
-                    Canvas.SetLeft(joint, jointPoints[jointType].X - JointThickness / 2);
-                    Canvas.SetTop(joint, jointPoints[jointType].Y - JointThickness / 2);
+                    Canvas.SetLeft(joint, centerX + (jointPoints[jointType].X - centerX) * this.scaleFactor);
+                    Canvas.SetTop(joint, centerY + (jointPoints[jointType].Y - centerY) * this.scaleFactor);
                     canvas.Children.Add(joint);
                 }
             }
         }
-
-
-
 
         /// <summary>
         /// Draws one bone of a body (joint to joint)
@@ -413,7 +622,7 @@ namespace Microsoft.Samples.Kinect.BodyBasics
         /// <param name="jointType1">second joint of bone to draw</param>
         /// <param name="drawingContext">drawing context to draw to</param>
         /// /// <param name="drawingPen">specifies color to draw a specific bone</param>
-        private void DrawBone(IReadOnlyDictionary<JointType, Joint> joints, IDictionary<JointType, Point> jointPoints, JointType jointType0, JointType jointType1, Canvas canvas, Pen drawingPen)
+        private void DrawBone(IReadOnlyDictionary<JointType, Joint> joints, IDictionary<JointType, Point> jointPoints, JointType jointType0, JointType jointType1, Canvas canvas, Pen drawingPen, double centerX, double centerY, double scaleFactor)
         {
             Joint joint0 = joints[jointType0];
             Joint joint1 = joints[jointType1];
@@ -426,20 +635,21 @@ namespace Microsoft.Samples.Kinect.BodyBasics
             Pen drawPen = this.inferredBonePen;
             if ((joint0.TrackingState == TrackingState.Tracked) && (joint1.TrackingState == TrackingState.Tracked))
             {
-                drawPen = drawingPen;
+                drawPen = new Pen(drawingPen.Brush, drawingPen.Thickness * scaleFactor);
             }
 
             System.Windows.Shapes.Line bone = new System.Windows.Shapes.Line
             {
-                X1 = jointPoints[jointType0].X,
-                Y1 = jointPoints[jointType0].Y,
-                X2 = jointPoints[jointType1].X,
-                Y2 = jointPoints[jointType1].Y,
+                X1 = centerX + (jointPoints[jointType0].X - centerX) * scaleFactor,
+                Y1 = centerY + (jointPoints[jointType0].Y - centerY) * scaleFactor,
+                X2 = centerX + (jointPoints[jointType1].X - centerX) * scaleFactor,
+                Y2 = centerY + (jointPoints[jointType1].Y - centerY) * scaleFactor,
                 Stroke = drawPen.Brush,
                 StrokeThickness = drawPen.Thickness
             };
             canvas.Children.Add(bone);
         }
+
 
 
         /// <summary>
@@ -527,40 +737,72 @@ namespace Microsoft.Samples.Kinect.BodyBasics
 
         private void show(object sender, EventArgs e)
         {
+            if (remainingTime <= 0) return; // 如果遊戲已結束，則不顯示新圖片
 
             Image randomImage = new Image();
             string[] imageFiles = { "ball.png", "bomb.png", "franch.png" };
-            int index = random.Next(imageFiles.Length);
-            randomImage.Source = new BitmapImage(new Uri($"pack://application:,,,/Images/{imageFiles[index]}"));
-            double canvasWidth = MainCanvas.ActualWidth;
-            double canvasHeight = MainCanvas.ActualHeight;
-            double randomX = random.Next(0, (int)canvasWidth - 100);
-            double randomY = random.Next(0, (int)canvasHeight - 100);
+            int index;
+            double randomX, randomY;
+
+            // 確保新圖片的位置不會與現有圖片重疊
+            bool isOverlapping;
+            do
+            {
+                // 調整圖片生成的機率
+                double rand = random.NextDouble();
+                if (rand < 0.4)
+                {
+                    index = 0; // 生成 ball.png
+                }
+                else if (rand < 0.8)
+                {
+                    index = 2; // 生成 franch.png
+                }
+                else
+                {
+                    index = 1; // 生成 bomb.png
+                }
+
+                randomImage.Source = new BitmapImage(new Uri($"pack://application:,,,/Images/{imageFiles[index]}"));
+                double canvasWidth = MainCanvas.ActualWidth;
+                double canvasHeight = MainCanvas.ActualHeight;
+
+                randomX = random.Next(0, (int)canvasWidth - 100);
+                randomY = random.Next(0, (int)canvasHeight - 100);
+                isOverlapping = false;
+                foreach (var imagePos in imagePositions.Values)
+                {
+                    if (Math.Abs(imagePos.X - randomX) < 100 && Math.Abs(imagePos.Y - randomY) < 100)
+                    {
+                        isOverlapping = true;
+                        break;
+                    }
+                }
+            } while (isOverlapping);
+
             randomImage.Width = 100;
             randomImage.Height = 100;
             Canvas.SetLeft(randomImage, randomX);
             Canvas.SetTop(randomImage, randomY);
 
-            // 添加新的 Image 到畫面和集合
             MainCanvas.Children.Add(randomImage);
             imagesOnCanvas.Add(randomImage);
-            imagePositions[randomImage] = new Point(randomX, randomY); // 儲存位置
+            imagePositions[randomImage] = new Point(randomX, randomY);
 
             DoubleAnimation fadeInAnimation = new DoubleAnimation
             {
-                From = 0.0, // 開始透明度
-                To = 1.0,   // 結束透明度
-                Duration = new Duration(TimeSpan.FromSeconds(2)) // 持續時間
+                From = 0.0,
+                To = 1.0,
+                Duration = new Duration(TimeSpan.FromSeconds(2))
             };
             DoubleAnimation fadeOutAnimation = new DoubleAnimation
             {
                 From = 1.0,
                 To = 0.0,
                 Duration = new Duration(TimeSpan.FromSeconds(2)),
-                BeginTime = TimeSpan.FromSeconds(5) // 延遲開始時間，以便在淡入後開始淡出
+                BeginTime = TimeSpan.FromSeconds(5)
             };
 
-            // 創建 Storyboard 並將動畫添加到 Storyboard
             Storyboard storyboard = new Storyboard();
             storyboard.Children.Add(fadeInAnimation);
             storyboard.Children.Add(fadeOutAnimation);
@@ -570,20 +812,31 @@ namespace Microsoft.Samples.Kinect.BodyBasics
             Storyboard.SetTarget(fadeOutAnimation, randomImage);
             Storyboard.SetTargetProperty(fadeOutAnimation, new PropertyPath("Opacity"));
 
-            // 當淡出動畫完成時移除圖片
             fadeOutAnimation.Completed += (senderCompleted, eventArgs) =>
             {
                 MainCanvas.Children.Remove(randomImage);
                 imagesOnCanvas.Remove(randomImage);
                 imagePositions.Remove(randomImage);
             };
-            // 開始動畫
+
             storyboard.Begin();
+
+
         }
-        //記分板code
+
+
+
+
+        private int score = 0;
+
+        private void IncreaseScore(int points)
+        {
+            score += points;
+            ScoreTextBox.Text = score.ToString();
+        }
         private void TextBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            //TODO 偵測扣分加分
+
         }
 
     }
