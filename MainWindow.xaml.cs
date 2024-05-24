@@ -293,6 +293,7 @@ namespace Microsoft.Samples.Kinect.BodyBasics
             StartButton.IsEnabled = false; // 禁用開始按鈕
         }
 
+
         private void EndGame()
         {
             gameTimer.Stop();
@@ -314,7 +315,9 @@ namespace Microsoft.Samples.Kinect.BodyBasics
             }
 
             StartButton.IsEnabled = true; // 啟用開始按鈕
+            gmaestarted = false; // 重置右手狀態
         }
+
 
 
         private void MainCanvas_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -445,7 +448,7 @@ namespace Microsoft.Samples.Kinect.BodyBasics
             }
         }
 
-
+        private bool gmaestarted = false;
 
 
         /// <summary>
@@ -497,6 +500,12 @@ namespace Microsoft.Samples.Kinect.BodyBasics
                             // 左手不是握拳
                             // 在左手位置繪製一個綠色圓圈
                             DrawHandPosition(body.Joints[JointType.HandLeft].Position, Brushes.Green);
+                        }
+
+                        if (!gmaestarted && body.Joints[JointType.HandRight].Position.Y - body.Joints[JointType.Head].Position.Y > 0.2f)
+                        {
+                            gmaestarted = true;
+                            StartGame(); // 開始遊戲
                         }
 
                         // 檢查右手狀態
